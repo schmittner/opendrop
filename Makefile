@@ -1,37 +1,44 @@
-.PHONY: ci checkformat isort lint pylint test autoformat
+.PHONY: ci black flake8 pylint isort pytest autoformat install
 
 VENV=venv
-PYTHON=$(VENV)/bin/python3
+PYTHON=python3
 
-ci: isort checkformat lint pylint test
+ci: black flake8 pylint isort pytest
 
 $(VENV): $(VENV)/bin/activate
 
-$(VENV)/bin/activate: setup.py requirements-dev.txt Makefile
+$(VENV)/bin/activate:
 ifeq (, $(shell which virtualenv))
 	$(error "`virtualenv` is not installed, consider running `pip3 install virtualenv`")
 endif
 	test -d $(VENV) || virtualenv -p python3 $(VENV)
-	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install -r requirements-dev.txt
-	$(PYTHON) -m pip install -e .
 	touch $(VENV)/bin/activate
 
-checkformat: $(VENV)
+install-requirements-dev: requirements-dev.txt
+	$(PYTHON) -m pip install -r $<
+	$(PYTHON) -m pip install -e .
+
+requirements-dev.txt: requirements-dev.in
+	pip-compile $<
+
+black: install-requirements-dev
 	$(PYTHON) -m black . --check --diff --exclude $(VENV)
 
-lint: $(VENV)	
+flake8: install-requirements-dev
 	$(PYTHON) -m flake8 . --count --show-source --statistics --exclude $(VENV)
 
-pylint: $(VENV)
+pylint: install-requirements-dev
 	$(PYTHON) -m pylint --rcfile=setup.cfg opendrop
 
-isort: $(VENV)
+isort: install-requirements-dev
 	$(PYTHON) -m isort -c opendrop/**.py
 
-test: $(VENV)
+pytest: install-requirements-dev
 	$(PYTHON) -m pytest
 
-autoformat: $(VENV)
+autoformat: install-requirements-dev
 	$(PYTHON) -m isort opendrop/**.py
 	$(PYTHON) -m black . --exclude $(VENV)
+
+install:
+	$(PYTHON) -m pip install -e .
